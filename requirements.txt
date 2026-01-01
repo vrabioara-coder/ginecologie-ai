@@ -1,5 +1,10 @@
 fastapi
 uvicorn
 jinja2
+aiofiles
 python-multipart
-openai
+passlib[bcrypt]
+sqlalchemy
+databases[sqlite]
+requests
+httpx
