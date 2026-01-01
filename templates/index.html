@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Asistent Ginecologie AI</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- Shake animation -->
+    <style>
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-3px); }
+            40% { transform: translateX(3px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake:hover {
+            animation: shake 0.4s;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+<div class="max-w-4xl w-full bg-white p-6 rounded-2xl shadow-lg">
+
+    <h1 class="text-3xl font-bold text-center mb-8 text-blue-700">
+        Asistent AI pentru Sarcină
+    </h1>
+
+    <!-- FORMULAR -->
+    <form method="post" class="mb-10">
+        <div class="mb-4">
+            <label class="block text-gray-700 font-semibold mb-2">
+                Săptămâna de sarcină
+            </label>
+            <input type="number" name="saptamana" required
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-gray-700 font-semibold mb-2">
+                Simptome
+            </label>
+            <textarea name="simptome" rows="4" required
+                      class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400"></textarea>
+        </div>
+
+        <button type="submit"
+                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+            Obține recomandări
+        </button>
+    </form>
+
+    {% if rezultat %}
+
+        <!-- URGENȚE -->
+        {% if rezultat.urgent %}
+            <h2 class="text-2xl font-semibold mb-4 text-red-600">
+                Situație urgentă
+            </h2>
+
+            <div class="grid grid-cols-1 gap-4 mb-10">
+                {% for rec in rezultat.urgent %}
+                    <div class="bg-red-100 border-l-8 border-red-600 p-4 rounded-xl shadow flex gap-4 shake">
+                        <span class="text-yellow-500 font-bold text-2xl">!</span>
+                        <p class="text-gray-800 font-medium">
+                            {{ rec }}
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- RECOMANDĂRI GENERALE -->
+        {% if rezultat.general %}
+            <h2 class="text-2xl font-semibold mb-4 text-blue-600">
+                Recomandări generale
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for rec in rezultat.general %}
+                    <div class="bg-blue-50 border-l-8 border-blue-500 p-4 rounded-xl shadow flex gap-4 shake">
+                        <span class="text-xl text-blue-600">{{ rec.icon }}</span>
+                        <p class="text-gray-800 font-medium">
+                            {{ rec.text }}
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+    {% endif %}
+
+</div>
+</body>
+</html>

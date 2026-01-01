@@ -1,0 +1,51 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+.card {
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    animation: shake 0.4s ease-in-out;
+}
+
+.urgent {
+    background: #ffe5e5;
+    border-left: 6px solid #d32f2f;
+}
+
+.general {
+    background: #e3f2fd;
+    border-left: 6px solid #1976d2;
+}
+
+.icon {
+    font-size: 20px;
+    margin-right: 8px;
+}
+
+/* shake effect */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    50% { transform: translateX(4px); }
+    75% { transform: translateX(-4px); }
+    100% { transform: translateX(0); }
+}
