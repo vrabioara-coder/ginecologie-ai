@@ -1,20 +1,21 @@
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from db import SessionLocal, engine, create_db, User, MedicalProfile
 from sqlalchemy.orm import Session
-from ai_module import get_ai_recommendation
-from db import SessionLocal, User
+from starlette.middleware.sessions import SessionMiddleware
+import hashlib
 
-import os
-from fastapi.templating import Jinja2Templates
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # directorul unde se află main.py
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+# Crează baza de date dacă nu există
+create_db()
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# Dependency pentru DB
 def get_db():
     db = SessionLocal()
     try:
@@ -22,39 +23,20 @@ def get_db():
     finally:
         db.close()
 
-# -------------------------
-# HOME / FORMULAR AI
-# -------------------------
+
+def hash_password(password: str):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "rezultat": None})
 
+
 @app.post("/", response_class=HTMLResponse)
-async def form(request: Request, db: Session = Depends(get_db)):
-    user_email = request.cookies.get("user_email")
-    if not user_email:
-        return RedirectResponse("/login")
+async def form(request: Request, saptamana: int = Form(...), simptome: str = Form(...)):
+    from ai_module import get_ai_recommendation
 
-    user = db.query(User).filter(User.email == user_email).first()
-    if not user:
-        return RedirectResponse("/login")
-
-    # verifică cereri gratuite
-    if user.plan == "free" and user.cereri_ramase <= 0:
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "error": "Ai epuizat cererile gratuite. Apasă Upgrade la Premium pentru acces nelimitat.",
-                "rezultat": None
-            }
-        )
-
-    form_data = await request.form()
-    saptamana = form_data.get("saptamana")
-    simptome = form_data.get("simptome")
-
-    # CACHE AI
     if not hasattr(app.state, "cache"):
         app.state.cache = {}
     key = f"{saptamana}-{simptome.lower()}"
@@ -64,94 +46,105 @@ async def form(request: Request, db: Session = Depends(get_db)):
         rezultat = get_ai_recommendation(saptamana, simptome)
         app.state.cache[key] = rezultat
 
-    # decrement cereri gratuite
-    if user.plan == "free":
-        user.cereri_ramase -= 1
-        db.commit()
-
     return templates.TemplateResponse(
         "index.html",
-        {
-            "request": request,
-            "rezultat": rezultat,
-            "saptamana": saptamana,
-            "simptome": simptome
-        }
+        {"request": request, "rezultat": rezultat, "saptamana": saptamana, "simptome": simptome},
     )
 
-# -------------------------
-# SIGNUP
-# -------------------------
+
 @app.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
+
 @app.post("/signup")
-async def signup(request: Request, db: Session = Depends(get_db)):
-    form = await request.form()
-    email = form.get("email")
-    password = form.get("password")  # atenție: hashing recomandat
-
-    if db.query(User).filter(User.email == email).first():
-        return templates.TemplateResponse("signup.html", {"request": request, "error": "Email deja folosit."})
-
-    user = User(email=email, password_hash=password, plan="free", cereri_ramase=20)
+def signup_action(
+    request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)
+):
+    hashed_pw = hash_password(password)
+    user = User(email=email, hashed_password=hashed_pw)
     db.add(user)
     db.commit()
-    response = RedirectResponse("/", status_code=302)
-    response.set_cookie("user_email", email)
+    response = RedirectResponse(url="/login", status_code=302)
     return response
 
-# -------------------------
-# LOGIN
-# -------------------------
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
+
 @app.post("/login")
-async def login(request: Request, db: Session = Depends(get_db)):
-    form = await request.form()
-    email = form.get("email")
-    password = form.get("password")
-
-    user = db.query(User).filter(User.email == email).first()
-    if not user or user.password_hash != password:
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Email sau parolă incorectă."})
-
-    response = RedirectResponse("/", status_code=302)
-    response.set_cookie("user_email", email)
-    return response
-
-# -------------------------
-# UPGRADE PREMIUM
-# -------------------------
-import hashlib
-
-MERCHANT_ID = "TEST_MERCHANT"
-SECRET_KEY = "SECRET_KEY"
-
-@app.post("/upgrade")
-async def upgrade(request: Request, db: Session = Depends(get_db)):
-    user_email = request.cookies.get("user_email")
-    user = db.query(User).filter(User.email == user_email).first()
-    if not user:
-        return RedirectResponse("/login")
-    
-    # exemplu link Netopia
-    amount = 10.0
-    data = f"{MERCHANT_ID}:{amount}:{SECRET_KEY}"
-    signature = hashlib.sha256(data.encode()).hexdigest()
-    payment_url = f"https://secure.mobilpay.ro/payment?merchant={MERCHANT_ID}&amount={amount}&sig={signature}"
-    
-    return RedirectResponse(payment_url)
-
-@app.post("/webhook")
-async def webhook(request: Request, db: Session = Depends(get_db)):
-    form = await request.form()
-    email = form.get("email")  # trimis de Netopia
-    user = db.query(User).filter(User.email == email).first()
+def login_action(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    hashed_pw = hash_password(password)
+    user = db.query(User).filter(User.email == email, User.hashed_password == hashed_pw).first()
     if user:
-        user.plan = "premium"
-        db.commit()
-    return {"status": "ok"}
+        request.session["user_id"] = user.id
+        return RedirectResponse(url="/profil", status_code=302)
+    else:
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Email sau parola incorectă"})
+
+
+@app.get("/profil", response_class=HTMLResponse)
+def profile_page(request: Request, db: Session = Depends(get_db)):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login")
+
+    profil = db.query(MedicalProfile).filter(MedicalProfile.user_id == user_id).first()
+    return templates.TemplateResponse("profil.html", {"request": request, "profil": profil})
+
+
+@app.post("/profil")
+def profile_update(
+    request: Request,
+    db: Session = Depends(get_db),
+    varsta: int = Form(None),
+    inaltime: int = Form(None),
+    greutate: int = Form(None),
+    grupa_sange: str = Form(None),
+    rh: str = Form(None),
+    nr_sarcini: int = Form(None),
+    nr_nasteri: int = Form(None),
+    tip_nasteri: str = Form(None),
+    avorturi: str = Form(None),
+    dum: str = Form(None),
+    dpn: str = Form(None),
+    complicatii: str = Form(None),
+    sarcina_risc: bool = Form(False),
+    boli: str = Form(None),
+    medicatie_sarcina: str = Form(None),
+    alergii: str = Form(None),
+    fumatoare: bool = Form(False),
+    alcool: bool = Form(False)
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login")
+
+    profil = db.query(MedicalProfile).filter(MedicalProfile.user_id == user_id).first()
+    if not profil:
+        profil = MedicalProfile(user_id=user_id)
+
+    profil.varsta = varsta
+    profil.inaltime = inaltime
+    profil.greutate = greutate
+    profil.grupa_sange = grupa_sange
+    profil.rh = rh
+    profil.nr_sarcini = nr_sarcini
+    profil.nr_nasteri = nr_nasteri
+    profil.tip_nasteri = tip_nasteri
+    profil.avorturi = avorturi
+    profil.dum = dum
+    profil.dpn = dpn
+    profil.complicatii = complicatii
+    profil.sarcina_risc = sarcina_risc
+    profil.boli = boli
+    profil.medicatie_sarcina = medicatie_sarcina
+    profil.alergii = alergii
+    profil.fumatoare = fumatoare
+    profil.alcool = alcool
+
+    db.add(profil)
+    db.commit()
+    return RedirectResponse(url="/profil", status_code=302)
