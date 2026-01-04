@@ -9,3 +9,4 @@ databases[sqlite]
 requests
 httpx
 openai
+itsdangerous>=2.1.2
