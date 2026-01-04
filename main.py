@@ -1,150 +1,228 @@
-from fastapi import FastAPI, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, status
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from db import SessionLocal, engine, create_db, User, MedicalProfile
-from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
-import hashlib
+from fastapi.staticfiles import StaticFiles
+from passlib.context import CryptContext
+import sqlite3
+import openai
+import os
+import json
 
-# Crează baza de date dacă nu există
-create_db()
+openai.api_key = os.getenv("OPENAI_API_KEY")  # sau pune direct cheia aici (nu e recomandat pentru producție)
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
-templates = Jinja2Templates(directory="templates")
+app.add_middleware(SessionMiddleware, secret_key="supersecret123")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+templates = Jinja2Templates(directory="templates")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
-def get_db():
-    db = SessionLocal()
+DB_FILE = "ginecologie.db"
+
+# ---------------- DB ----------------
+def get_db_connection():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def create_tables():
+    conn = get_db_connection()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            nume TEXT,
+            prenume TEXT,
+            email TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+    print("Baza de date a fost creată!")
+
+@app.on_event("startup")
+def startup():
+    create_tables()
+
+# ---------------- Auth ----------------
+# Hash parola
+# Hash parola
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)  # Fără encode sau slice
+
+# Verificare parola
+def verify_password(plain_password, hashed_password) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)  # Fără encode sau slice
+
+# ---------------- AI ----------------
+import openai
+import os
+import json
+
+openai.api_key = os.getenv("OPENAI_API_KEY")  # asigură-te că ai cheia setată
+
+def generate_recommendations(simptome: str, saptamani_sarcina: int):
+    """
+    Generează recomandări pentru un pacient gravid.
+    - 'urgent': rezumat al simptomelor + simptome care necesită mers la spital și 3 posibile diagnostice.
+    - 'general': 5 recomandări generale în funcție de simptome și săptămânile de sarcină.
+    """
+    prompt = f"""
+Ești un medic profesionist specializat în sarcină.
+Pacientul are {saptamani_sarcina} săptămâni de sarcină și prezintă următoarele simptome: {simptome}.
+
+Oferă recomandări structurate în două categorii:
+1. Urgent:
+   - Începe cu un mic rezumat al simptomelor și ce ar putea însemna ele.
+   - Apoi listează 3 posibile diagnostice care necesită evaluare imediată la spital.
+2. General: 5 recomandări generale pentru sănătatea în sarcină, ce poate face acasă pentru a se menține sănătoasă.
+
+Răspunde STRICT în format JSON cu cheile:
+{{
+    "urgent": ["rezumat al simptomelor", "diagnostic + recomandare 1", "diagnostic + recomandare 2", "diagnostic + recomandare 3"],
+    "general": ["sfat general 1", "sfat general 2", "sfat general 3", "sfat general 4", "sfat general 5"]
+}}
+"""
+
     try:
-        yield db
-    finally:
-        db.close()
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Ești un asistent medical profesionist."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=700,
+            temperature=0.7
+        )
 
+        text = response.choices[0].message.content
 
-def hash_password(password: str):
-    return hashlib.sha256(password.encode()).hexdigest()
+        # Încearcă să parsezi JSON-ul
+        try:
+            data = json.loads(text)
+            urgent = data.get("urgent", [])
+            general = data.get("general", [])
+            return {"urgent": urgent, "general": general}
+        except json.JSONDecodeError:
+            return {"urgent": [], "general": [text]}
+    except Exception as e:
+        return {"urgent": [], "general": [f"Eroare la generarea recomandărilor: {e}"]}
 
+# ---------------- Routes ----------------
+@app.get("/")
+def index(request: Request):
+    profil = request.session.get("user")
+    return templates.TemplateResponse("index.html", {"request": request, "profil": profil})
 
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "rezultat": None})
-
-
-@app.post("/", response_class=HTMLResponse)
-async def form(request: Request, saptamana: int = Form(...), simptome: str = Form(...)):
-    from ai_module import get_ai_recommendation
-
-    if not hasattr(app.state, "cache"):
-        app.state.cache = {}
-    key = f"{saptamana}-{simptome.lower()}"
-    if key in app.state.cache:
-        rezultat = app.state.cache[key]
-    else:
-        rezultat = get_ai_recommendation(saptamana, simptome)
-        app.state.cache[key] = rezultat
-
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "rezultat": rezultat, "saptamana": saptamana, "simptome": simptome},
-    )
-
-
-@app.get("/signup", response_class=HTMLResponse)
-def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
-
-
-@app.post("/signup")
-def signup_action(
-    request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)
-):
-    hashed_pw = hash_password(password)
-    user = User(email=email, hashed_password=hashed_pw)
-    db.add(user)
-    db.commit()
-    response = RedirectResponse(url="/login", status_code=302)
-    return response
-
-
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
+@app.get("/login")
+def login_get(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "eroare": None})
 
 @app.post("/login")
-def login_action(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    hashed_pw = hash_password(password)
-    user = db.query(User).filter(User.email == email, User.hashed_password == hashed_pw).first()
-    if user:
-        request.session["user_id"] = user.id
-        return RedirectResponse(url="/profil", status_code=302)
-    else:
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Email sau parola incorectă"})
+def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
+    conn = get_db_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    conn.close()
 
+    if user and verify_password(password, user["password"]):
+        request.session["user"] = {
+            "username": user["username"],
+            "nume": user["nume"],
+            "prenume": user["prenume"],
+            "email": user["email"]
+        }
+        return RedirectResponse("/profil", status_code=302)
 
-@app.get("/profil", response_class=HTMLResponse)
-def profile_page(request: Request, db: Session = Depends(get_db)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login")
+    return templates.TemplateResponse("login.html", {"request": request, "eroare": "Date invalide"})
 
-    profil = db.query(MedicalProfile).filter(MedicalProfile.user_id == user_id).first()
-    return templates.TemplateResponse("profil.html", {"request": request, "profil": profil})
+@app.get("/signup")
+def signup_get(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request, "eroare": None})
 
+@app.post("/signup")
+def signup_post(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    nume: str = Form(...),
+    prenume: str = Form(...),
+    email: str = Form(...)
+):
+    try:
+        conn = get_db_connection()
+        conn.execute(
+            "INSERT INTO users (username, password, nume, prenume, email) VALUES (?, ?, ?, ?, ?)",
+            (username, hash_password(password), nume, prenume, email)
+        )
+        conn.commit()
+        conn.close()
+        return RedirectResponse("/login", status_code=302)
+    except sqlite3.IntegrityError:
+        return templates.TemplateResponse("signup.html", {"request": request, "eroare": "Username deja existent"})
+
+@app.get("/profil")
+def profil_get(request: Request):
+    profil = request.session.get("user")
+    if not profil:
+        return RedirectResponse("/login", status_code=302)
+
+    return templates.TemplateResponse(
+        "profil.html",
+        {"request": request, "profil": profil, "recomandari": None}
+    )
 
 @app.post("/profil")
-def profile_update(
-    request: Request,
-    db: Session = Depends(get_db),
-    varsta: int = Form(None),
-    inaltime: int = Form(None),
-    greutate: int = Form(None),
-    grupa_sange: str = Form(None),
-    rh: str = Form(None),
-    nr_sarcini: int = Form(None),
-    nr_nasteri: int = Form(None),
-    tip_nasteri: str = Form(None),
-    avorturi: str = Form(None),
-    dum: str = Form(None),
-    dpn: str = Form(None),
-    complicatii: str = Form(None),
-    sarcina_risc: bool = Form(False),
-    boli: str = Form(None),
-    medicatie_sarcina: str = Form(None),
-    alergii: str = Form(None),
-    fumatoare: bool = Form(False),
-    alcool: bool = Form(False)
-):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login")
-
-    profil = db.query(MedicalProfile).filter(MedicalProfile.user_id == user_id).first()
+async def profil_post(request: Request):
+    profil = request.session.get("user")
     if not profil:
-        profil = MedicalProfile(user_id=user_id)
+        return RedirectResponse("/login", status_code=302)
 
-    profil.varsta = varsta
-    profil.inaltime = inaltime
-    profil.greutate = greutate
-    profil.grupa_sange = grupa_sange
-    profil.rh = rh
-    profil.nr_sarcini = nr_sarcini
-    profil.nr_nasteri = nr_nasteri
-    profil.tip_nasteri = tip_nasteri
-    profil.avorturi = avorturi
-    profil.dum = dum
-    profil.dpn = dpn
-    profil.complicatii = complicatii
-    profil.sarcina_risc = sarcina_risc
-    profil.boli = boli
-    profil.medicatie_sarcina = medicatie_sarcina
-    profil.alergii = alergii
-    profil.fumatoare = fumatoare
-    profil.alcool = alcool
+    form = await request.form()
 
-    db.add(profil)
-    db.commit()
-    return RedirectResponse(url="/profil", status_code=302)
+    # Preluare date complet profil
+    nume = form.get("nume", profil["nume"])
+    prenume = form.get("prenume", profil["prenume"])
+    email = form.get("email", profil["email"])
+    simptome = form.get("simptome", "").strip()
+    
+    # Preluare număr săptămâni de sarcină
+    try:
+        saptamani_sarcina = int(form.get("saptamani_sarcina", "0"))
+    except ValueError:
+        saptamani_sarcina = 0
+
+    # Salvează datele în DB
+    username = profil["username"]
+    conn = get_db_connection()
+    conn.execute(
+        "UPDATE users SET nume = ?, prenume = ?, email = ? WHERE username = ?",
+        (nume, prenume, email, username)
+    )
+    conn.commit()
+    conn.close()
+
+    # Actualizează sesiunea
+    request.session["user"] = {
+        "username": username,
+        "nume": nume,
+        "prenume": prenume,
+        "email": email
+    }
+
+    # Generează recomandări AI dacă sunt simptome
+    recomandari = generate_recommendations(simptome, saptamani_sarcina) if simptome else None
+
+    return templates.TemplateResponse(
+        "profil.html",
+        {
+            "request": request,
+            "profil": request.session["user"],
+            "recomandari": recomandari
+        }
+    )
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=302)

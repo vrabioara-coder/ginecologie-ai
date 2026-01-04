@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, create_engine
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-DATABASE_URL = "sqlite:///./database.db"
+# --- Config DB ---
+DATABASE_URL = "sqlite:///./users.db"
 
 engine = create_engine(
     DATABASE_URL,
@@ -9,10 +10,9 @@ engine = create_engine(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
-
+# --- Modele ---
 class User(Base):
     __tablename__ = "users"
 
@@ -27,7 +27,6 @@ class User(Base):
         cascade="all, delete"
     )
 
-
 class MedicalProfile(Base):
     __tablename__ = "medical_profiles"
 
@@ -36,8 +35,8 @@ class MedicalProfile(Base):
 
     # Date generale
     varsta = Column(Integer)
-    inaltime = Column(Integer)
-    greutate = Column(Integer)
+    inaltime = Column(Float)
+    greutate = Column(Float)
     grupa_sange = Column(String)
     rh = Column(String)
 
@@ -45,18 +44,18 @@ class MedicalProfile(Base):
     nr_sarcini = Column(Integer)
     nr_nasteri = Column(Integer)
     tip_nasteri = Column(String)
-    avorturi = Column(String)  # spontane / la cerere
-    dum = Column(String)       # Data ultimei menstruatii
-    dpn = Column(String)       # Data probabila a nasterii
+    avorturi = Column(Integer)
+    dum = Column(String)
+    dpn = Column(String)
 
-    # Sarcina curenta
+    # Sarcina curentă
     complicatii = Column(String)
     sarcina_risc = Column(Boolean, default=False)
 
     # Afecțiuni
     boli = Column(String)
 
-    # Medicație
+    # Medicație și alergii
     medicatie_sarcina = Column(String)
     alergii = Column(String)
 
@@ -66,6 +65,14 @@ class MedicalProfile(Base):
 
     user = relationship("User", back_populates="medical_profile")
 
-
+# --- Funcții helper ---
 def create_db():
     Base.metadata.create_all(bind=engine)
+    print("Baza de date a fost creată!")
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

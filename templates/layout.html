@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Asistent Ginecologie AI{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-3px); }
+            40% { transform: translateX(3px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+            100% { transform: translateX(0); }
+        }
+        .shake:hover { animation: shake 0.5s; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex">
+
+    <!-- MENIU LATERAL ROZ -->
+    <aside class="w-64 bg-pink-300 text-white flex flex-col p-6">
+        <h2 class="text-2xl font-bold mb-8">Asistent AI</h2>
+        <nav class="space-y-4 text-lg">
+            {% if request.session.user_id %}
+                <a href="/" class="block hover:bg-pink-400 rounded-lg px-4 py-2">🧠 Consult AI</a>
+                <a href="/profil" class="block hover:bg-pink-400 rounded-lg px-4 py-2">📋 Profil medical</a>
+                <a href="/logout" class="block hover:bg-pink-400 rounded-lg px-4 py-2">🚪 Logout</a>
+            {% else %}
+                <a href="/login" class="block hover:bg-pink-400 rounded-lg px-4 py-2">Login</a>
+                <a href="/signup" class="block hover:bg-pink-400 rounded-lg px-4 py-2">Creează cont</a>
+            {% endif %}
+        </nav>
+        <div class="mt-auto text-sm opacity-80">© 2026 Ginecologie AI</div>
+    </aside>
+
+    <!-- CONȚINUT PRINCIPAL -->
+    <main class="flex-1 p-6 overflow-y-auto">
+        {% block content %}{% endblock %}
+    </main>
+
+</body>
+</html>

@@ -4,113 +4,89 @@
     <meta charset="UTF-8">
     <title>Profil Medical</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Shake / puls animation */
-        @keyframes shake {
-            0% { transform: translateX(0); }
-            20% { transform: translateX(-3px); }
-            40% { transform: translateX(3px); }
-            60% { transform: translateX(-3px); }
-            80% { transform: translateX(3px); }
-            100% { transform: translateX(0); }
-        }
-
-        .shake:hover {
-            animation: shake 0.5s;
-        }
-    </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-4xl w-full bg-white p-6 rounded-2xl shadow-lg">
-        <h1 class="text-3xl font-bold text-center mb-6 text-blue-700">Profilul Medical</h1>
 
-        <form method="post" class="space-y-4">
-            <!-- Date generale -->
-            <div>
-                <label class="block font-semibold">Vârstă:</label>
-                <input type="number" name="varsta" value="{{ profil.varsta if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Înălțime (cm):</label>
-                <input type="number" name="inaltime" value="{{ profil.inaltime if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Greutate (kg):</label>
-                <input type="number" name="greutate" value="{{ profil.greutate if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Grupa de sânge:</label>
-                <input type="text" name="grupa_sange" value="{{ profil.grupa_sange if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Rh:</label>
-                <input type="text" name="rh" value="{{ profil.rh if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
+<body class="bg-gray-100 min-h-screen flex">
 
-            <!-- Istoric obstetrical -->
-            <div>
-                <label class="block font-semibold">Număr sarcini:</label>
-                <input type="number" name="nr_sarcini" value="{{ profil.nr_sarcini if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Număr nașteri:</label>
-                <input type="number" name="nr_nasteri" value="{{ profil.nr_nasteri if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Tip nașteri:</label>
-                <input type="text" name="tip_nasteri" value="{{ profil.tip_nasteri if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">Avorturi (spontane / la cerere):</label>
-                <input type="text" name="avorturi" value="{{ profil.avorturi if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">DUM (Data ultimei menstruații):</label>
-                <input type="date" name="dum" value="{{ profil.dum if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold">DPN (Data probabilă a nașterii):</label>
-                <input type="date" name="dpn" value="{{ profil.dpn if profil else '' }}" class="w-full p-2 border rounded-lg">
-            </div>
+<aside class="w-64 bg-pink-300 text-white flex flex-col p-6">
+    <h2 class="text-2xl font-bold mb-8">Asistent AI</h2>
+    <nav class="space-y-4 text-lg">
+        <a href="/profil" class="block bg-pink-400 rounded-lg px-4 py-2 font-semibold">📋 Profil medical</a>
+        <a href="/" class="block hover:bg-pink-400 rounded-lg px-4 py-2">🧠 Consult AI</a>
+        <a href="/logout" class="block hover:bg-pink-400 rounded-lg px-4 py-2">🚪 Logout</a>
+    </nav>
+</aside>
 
-            <!-- Sarcina curenta -->
-            <div>
-                <label class="block font-semibold">Complicații:</label>
-                <textarea name="complicatii" class="w-full p-2 border rounded-lg">{{ profil.complicatii if profil else '' }}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Sarcină cu risc:</label>
-                <input type="checkbox" name="sarcina_risc" {% if profil and profil.sarcina_risc %}checked{% endif %}>
-            </div>
+<main class="flex-1 p-6 overflow-y-auto">
+<div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
 
-            <!-- Afecțiuni -->
-            <div>
-                <label class="block font-semibold">Boli / afecțiuni:</label>
-                <textarea name="boli" class="w-full p-2 border rounded-lg">{{ profil.boli if profil else '' }}</textarea>
-            </div>
+<h1 class="text-3xl font-bold text-center mb-6 text-blue-700">Profil Medical</h1>
 
-            <!-- Medicatie si alergii -->
-            <div>
-                <label class="block font-semibold">Medicație în sarcina actuală:</label>
-                <textarea name="medicatie_sarcina" class="w-full p-2 border rounded-lg">{{ profil.medicatie_sarcina if profil else '' }}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Alergii:</label>
-                <textarea name="alergii" class="w-full p-2 border rounded-lg">{{ profil.alergii if profil else '' }}</textarea>
-            </div>
+<form method="post" action="/profil" class="space-y-4">
 
-            <!-- Stil de viață -->
-            <div>
-                <label class="block font-semibold">Fumătoare:</label>
-                <input type="checkbox" name="fumatoare" {% if profil and profil.fumatoare %}checked{% endif %}>
-            </div>
-            <div>
-                <label class="block font-semibold">Alcool:</label>
-                <input type="checkbox" name="alcool" {% if profil and profil.alcool %}checked{% endif %}>
-            </div>
+<!-- Date generale -->
+<input type="number" name="varsta" placeholder="Vârstă" class="w-full p-2 border rounded-lg">
+<input type="number" name="inaltime" placeholder="Înălțime (cm)" class="w-full p-2 border rounded-lg">
+<input type="number" name="greutate" placeholder="Greutate (kg)" class="w-full p-2 border rounded-lg">
+<input type="text" name="grupa_sange" placeholder="Grupa de sânge" class="w-full p-2 border rounded-lg">
+<input type="text" name="rh" placeholder="Rh" class="w-full p-2 border rounded-lg">
 
-            <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">Salvează profilul</button>
-        </form>
-    </div>
+<!-- Istoric obstetrical -->
+<input type="number" name="nr_sarcini" placeholder="Număr sarcini" class="w-full p-2 border rounded-lg">
+<input type="number" name="nr_nasteri" placeholder="Număr nașteri" class="w-full p-2 border rounded-lg">
+<input type="text" name="tip_nasteri" placeholder="Tip nașteri" class="w-full p-2 border rounded-lg">
+<input type="text" name="avorturi" placeholder="Avorturi" class="w-full p-2 border rounded-lg">
+<input type="date" name="dum" class="w-full p-2 border rounded-lg">
+<input type="date" name="dpn" class="w-full p-2 border rounded-lg">
+
+<!-- Sarcină -->
+<input type="number" name="saptamani_sarcina" placeholder="Săptămâni sarcină" min="1" max="42" value="{{ profil.saptamani_sarcina | default(0) }}"
+       class="w-full p-2 border rounded-lg">
+<textarea name="complicatii" placeholder="Complicații" class="w-full p-2 border rounded-lg"></textarea>
+<label><input type="checkbox" name="sarcina_risc" value="true"> Sarcină cu risc</label>
+
+<!-- Afecțiuni -->
+<textarea name="boli" placeholder="Boli" class="w-full p-2 border rounded-lg"></textarea>
+
+<!-- Medicație -->
+<textarea name="medicatie_sarcina" placeholder="Medicație" class="w-full p-2 border rounded-lg"></textarea>
+<textarea name="alergii" placeholder="Alergii" class="w-full p-2 border rounded-lg"></textarea>
+
+<!-- Stil de viață -->
+<label><input type="checkbox" name="fumatoare" value="true"> Fumătoare</label>
+<label><input type="checkbox" name="alcool" value="true"> Alcool</label>
+
+<!-- AI -->
+<input type="text" name="simptome" placeholder="Simptome curente" class="w-full p-2 border rounded-lg" required>
+
+<button type="submit"
+        class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">
+    Salvează profilul și verifică AI
+</button>
+
+</form>
+
+{% if recomandari %}
+<div class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
+
+{% if recomandari.urgent %}
+<h2 class="text-xl font-bold text-red-600 mb-2">⚠️ Simptome urgente</h2>
+{% for t in recomandari.urgent %}
+<p>{{ t }}</p>
+{% endfor %}
+{% endif %}
+
+{% if recomandari.general %}
+<h2 class="text-xl font-bold mt-4 mb-2">Recomandări generale</h2>
+{% for g in recomandari.general %}
+<p>✔️ {{ g }}</p>
+{% endfor %}
+{% endif %}
+
+</div>
+{% endif %}
+
+</div>
+</main>
 </body>
 </html>

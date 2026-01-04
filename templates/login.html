@@ -1,38 +1,36 @@
-<!DOCTYPE html>
-<html lang="ro">
-<head>
-    <meta charset="UTF-8">
-    <title>Login - Asistent Ginecologie AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-md w-full bg-white p-6 rounded-2xl shadow-lg">
-        <h1 class="text-3xl font-bold text-center mb-6 text-blue-700">Autentificare</h1>
+{% extends "layout.html" %}
 
-        {% if error %}
-            <p class="bg-red-100 text-red-700 p-2 rounded mb-4">{{ error }}</p>
-        {% endif %}
+{% block title %}Login - Asistent Ginecologie AI{% endblock %}
 
-        <form method="post">
-            <div class="mb-4">
-                <label class="block text-gray-700 font-semibold mb-2">Email:</label>
-                <input type="email" name="email" required
-                       class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
-            </div>
+{% block content %}
+<div class="max-w-md w-full bg-white p-6 rounded-2xl shadow-lg mx-auto mt-12">
+    <h1 class="text-3xl font-bold text-center mb-6 text-blue-700">Autentificare</h1>
 
-            <div class="mb-4">
-                <label class="block text-gray-700 font-semibold mb-2">Parolă:</label>
-                <input type="password" name="password" required
-                       class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
-            </div>
+    {% if eroare %}
+        <p class="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{{ eroare }}</p>
+    {% endif %}
 
-            <button type="submit"
-                    class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition w-full">
-                Loghează-te
-            </button>
-        </form>
+    <form action="/login" method="post" class="space-y-4">
+        <div>
+            <label class="block font-semibold mb-1">Username:</label>
+            <input type="text" name="username" required
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
 
-        <p class="mt-4 text-center">Nu ai cont? <a href="/signup" class="text-blue-600 underline">Creează cont</a></p>
-    </div>
-</body>
-</html>
+        <div>
+            <label class="block font-semibold mb-1">Parolă:</label>
+            <input type="password" name="password" required
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+
+        <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition">
+            Loghează-te
+        </button>
+    </form>
+
+    <p class="mt-4 text-center text-sm">
+        Nu ai cont? 
+        <a href="/signup" class="text-blue-600 underline hover:text-blue-800">Creează cont</a>
+    </p>
+</div>
+{% endblock %}
